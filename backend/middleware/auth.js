@@ -34,7 +34,14 @@ const auth = async (req, res, next) => {
     }
 
     // Add user to request object
-    req.user = decoded;
+    req.user = {
+      _id: user._id,
+      userId: decoded.userId,
+      email: user.email,
+      fullName: user.fullName,
+      username: user.username,
+      role: user.role
+    };
     next();
 
   } catch (error) {

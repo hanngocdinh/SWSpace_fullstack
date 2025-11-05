@@ -19,8 +19,26 @@ const bookingSchema = new mongoose.Schema({
   // Service information
   serviceType: {
     type: String,
-    enum: ['hot-desk', 'fixed-desk', 'meeting-room', 'private-office'],
+    enum: ['hot-desk', 'fixed-desk', 'meeting-room', 'private-office', 'Private Office', 'Meeting Room', 'Networking Space'],
     required: [true, 'Service type is required']
+  },
+
+  // For team services
+  isTeamService: {
+    type: Boolean,
+    default: false
+  },
+  teamServiceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'TeamService'
+  },
+  teamRoomId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'TeamRoom'
+  },
+  durationPackageId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DurationPackage'
   },
 
   // Package information

@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const bookingRoutes = require('./routes/bookings');
 const paymentMethodRoutes = require('./routes/payment-methods');
 const qrRoutes = require('./routes/qr');
+const teamServiceRoutes = require('./routes/team-services');
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/payment-methods', paymentMethodRoutes);
 app.use('/api/qr', qrRoutes);
+app.use('/api/team', teamServiceRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
