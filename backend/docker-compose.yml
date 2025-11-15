@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: swspace_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: swspace
+      POSTGRES_USER: swspace_user
+      POSTGRES_PASSWORD: swspace_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - swspace_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swspace_user -d swspace"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: swspace_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@swspace.vn
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "127.0.0.1:9090:80"   # dùng 9090 và bind localhost
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - swspace_network
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+networks:
+  swspace_network:
+    driver: bridge
