@@ -1,0 +1,506 @@
+import React, { useState, useEffect } from 'react';
+import styled from 'styled-components';
+import { useAuth } from '../contexts/AuthContext';
+import Header from '../components/layout/Header';
+import Footer from '../components/layout/Footer';
+import { FaHistory, FaCalendar, FaMapMarkerAlt, FaClock, FaMoneyBillWave, FaFilter, FaSearch, FaTrash, FaExclamationTriangle } from 'react-icons/fa';
+
+const PageContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+`;
+
+const MainContent = styled.main`
+  flex: 1;
+  padding-top: 80px;
+  background-color: #f8f9fa;
+`;
+
+const Container = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+`;
+
+const PageHeader = styled.div`
+  background: white;
+  border-radius: 10px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+`;
+
+const PageTitle = styled.h1`
+  color: #333;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+`;
+
+const FilterContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+`;
+
+const FilterSelect = styled.select`
+  padding: 0.7rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: white;
+  font-size: 0.9rem;
+  
+  &:focus {
+    outline: none;
+    border-color: #45bf55;
+  }
+`;
+
+const SearchInput = styled.input`
+  padding: 0.7rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  flex: 1;
+  min-width: 200px;
+  
+  &:focus {
+    outline: none;
+    border-color: #45bf55;
+  }
+`;
+
+const SearchContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 250px;
+`;
+
+const BookingGrid = styled.div`
+  display: grid;
+  gap: 1.5rem;
+`;
+
+const BookingCard = styled.div`
+  background: white;
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+`;
+
+const BookingHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+`;
+
+const BookingReference = styled.div`
+  font-weight: 600;
+  color: #45bf55;
+  font-size: 1.2rem;
+`;
+
+const BookingStatus = styled.div`
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  background-color: ${props => {
+    switch (props.status) {
+      case 'confirmed': return '#d4edda';
+      case 'pending': return '#fff3cd';
+      case 'cancelled': return '#f8d7da';
+      case 'paid': return '#d1ecf1';
+      default: return '#e2e3e5';
+    }
+  }};
+  color: ${props => {
+    switch (props.status) {
+      case 'confirmed': return '#155724';
+      case 'pending': return '#856404';
+      case 'cancelled': return '#721c24';
+      case 'paid': return '#0c5460';
+      default: return '#383d41';
+    }
+  }};
+`;
+
+const BookingInfo = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+`;
+
+const InfoSection = styled.div`
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid #45bf55;
+`;
+
+const InfoTitle = styled.div`
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const InfoDetails = styled.div`
+  color: #666;
+  line-height: 1.5;
+`;
+
+const PaginationContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+`;
+
+const PaginationButton = styled.button`
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s;
+  
+  &:hover:not(:disabled) {
+    background: #45bf55;
+    color: white;
+    border-color: #45bf55;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  &.active {
+    background: #45bf55;
+    color: white;
+    border-color: #45bf55;
+  }
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 3rem;
+  font-size: 1.1rem;
+  color: #666;
+`;
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+`;
+
+const BookingHistoryPage = () => {
+  const { currentUser } = useAuth();
+  const [bookings, setBookings] = useState([]);
+  const [filteredBookings, setFilteredBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [deleteModal, setDeleteModal] = useState({ show: false, booking: null });
+  const [deleting, setDeleting] = useState(false);
+  const itemsPerPage = 5;
+
+  useEffect(() => {
+    fetchBookings();
+  }, []);
+
+  useEffect(() => {
+    filterBookings();
+  }, [bookings, statusFilter, searchTerm]);
+
+  const fetchBookings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      console.log('🔍 BookingHistory: Token from localStorage:', token ? 'Found' : 'Not found');
+      
+      if (!token) {
+        console.log('❌ BookingHistory: No token found, skipping fetch');
+        setLoading(false);
+        return;
+      }
+
+      console.log('📡 BookingHistory: Fetching bookings...');
+      const response = await fetch('http://localhost:3001/api/bookings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('📋 BookingHistory: Response status:', response.status);
+      console.log('📋 BookingHistory: Response headers:', response.headers);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ BookingHistory: Bookings data received:', data);
+        console.log('📊 BookingHistory: Number of bookings:', data.bookings?.length || 0);
+        setBookings(data.bookings || []);
+      } else {
+        const errorText = await response.text();
+        console.error('❌ BookingHistory: Error response:', response.status, errorText);
+        
+        // Try to parse as JSON if possible
+        try {
+          const errorData = JSON.parse(errorText);
+          console.error('❌ BookingHistory: Error data:', errorData);
+        } catch (e) {
+          console.error('❌ BookingHistory: Raw error text:', errorText);
+        }
+      }
+    } catch (error) {
+      console.error('💥 BookingHistory: Error fetching bookings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterBookings = () => {
+    let filtered = [...bookings];
+
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(booking => booking.status === statusFilter);
+    }
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(booking =>
+        booking.bookingReference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        booking.seatName.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredBookings(filtered);
+    setCurrentPage(1);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(amount);
+  };
+
+  const getServiceTypeLabel = (serviceType) => {
+    const labels = {
+      'hot-desk': 'Hot Desk',
+      'fixed-desk': 'Fixed Desk',
+      'meeting-room': 'Meeting Room',
+      'private-office': 'Private Office'
+    };
+    return labels[serviceType] || serviceType;
+  };
+
+  const getPackageDurationLabel = (duration) => {
+    const labels = {
+      'daily': 'Daily',
+      'weekly': 'Weekly',
+      'monthly': 'Monthly',
+      'yearly': 'Yearly'
+    };
+    return labels[duration] || duration;
+  };
+
+  // Pagination
+  const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentBookings = filteredBookings.slice(startIndex, endIndex);
+
+  if (!currentUser) {
+    return (
+      <PageContainer>
+        <Header />
+        <MainContent>
+          <Container>
+            <div>Please login to view your booking history.</div>
+          </Container>
+        </MainContent>
+        <Footer />
+      </PageContainer>
+    );
+  }
+
+  return (
+    <PageContainer>
+      <Header />
+      <MainContent>
+        <Container>
+          <PageHeader>
+            <PageTitle>
+              <FaHistory />
+              Booking History
+            </PageTitle>
+            
+            <FilterContainer>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FaFilter />
+                <FilterSelect
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="paid">Paid</option>
+                  <option value="cancelled">Cancelled</option>
+                </FilterSelect>
+              </div>
+              
+              <SearchContainer>
+                <FaSearch />
+                <SearchInput
+                  type="text"
+                  placeholder="Search by booking reference or seat name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </SearchContainer>
+            </FilterContainer>
+          </PageHeader>
+
+          {loading ? (
+            <LoadingContainer>Loading your booking history...</LoadingContainer>
+          ) : currentBookings.length === 0 ? (
+            <EmptyState>
+              <FaHistory size={48} color="#ccc" />
+              <h3>No bookings found</h3>
+              <p>
+                {filteredBookings.length === 0 && bookings.length === 0
+                  ? "You haven't made any bookings yet."
+                  : "No bookings match your current filters."}
+              </p>
+            </EmptyState>
+          ) : (
+            <>
+              <BookingGrid>
+                {currentBookings.map(booking => (
+                  <BookingCard key={booking._id}>
+                    <BookingHeader>
+                      <BookingReference>#{booking.bookingReference}</BookingReference>
+                      <BookingStatus status={booking.status}>
+                        {booking.status}
+                      </BookingStatus>
+                    </BookingHeader>
+                    
+                    <BookingInfo>
+                      <InfoSection>
+                        <InfoTitle>
+                          <FaMapMarkerAlt />
+                          Workspace Details
+                        </InfoTitle>
+                        <InfoDetails>
+                          <div><strong>Type:</strong> {getServiceTypeLabel(booking.serviceType)}</div>
+                          <div><strong>Seat:</strong> {booking.seatName}</div>
+                          <div><strong>Floor:</strong> {booking.floor}</div>
+                          <div><strong>Package:</strong> {getPackageDurationLabel(booking.packageDuration)}</div>
+                        </InfoDetails>
+                      </InfoSection>
+                      
+                      <InfoSection>
+                        <InfoTitle>
+                          <FaCalendar />
+                          Date & Time
+                        </InfoTitle>
+                        <InfoDetails>
+                          <div><strong>Start:</strong> {formatDate(booking.startDate)}</div>
+                          <div><strong>End:</strong> {formatDate(booking.endDate)}</div>
+                          <div><strong>Time:</strong> {booking.startTime} - {booking.endTime}</div>
+                        </InfoDetails>
+                      </InfoSection>
+                      
+                      <InfoSection>
+                        <InfoTitle>
+                          <FaMoneyBillWave />
+                          Payment Information
+                        </InfoTitle>
+                        <InfoDetails>
+                          <div><strong>Base Price:</strong> {formatCurrency(booking.basePrice)}</div>
+                          {booking.discountPercentage > 0 && (
+                            <div><strong>Discount:</strong> {booking.discountPercentage}%</div>
+                          )}
+                          <div><strong>Final Price:</strong> {formatCurrency(booking.finalPrice)}</div>
+                          <div><strong>Payment:</strong> {booking.paymentStatus || 'Pending'}</div>
+                        </InfoDetails>
+                      </InfoSection>
+                    </BookingInfo>
+                  </BookingCard>
+                ))}
+              </BookingGrid>
+
+              {totalPages > 1 && (
+                <PaginationContainer>
+                  <PaginationButton
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </PaginationButton>
+                  
+                  {[...Array(totalPages)].map((_, index) => (
+                    <PaginationButton
+                      key={index + 1}
+                      onClick={() => setCurrentPage(index + 1)}
+                      className={currentPage === index + 1 ? 'active' : ''}
+                    >
+                      {index + 1}
+                    </PaginationButton>
+                  ))}
+                  
+                  <PaginationButton
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </PaginationButton>
+                </PaginationContainer>
+              )}
+            </>
+          )}
+        </Container>
+      </MainContent>
+      <Footer />
+    </PageContainer>
+  );
+};
+
+export default BookingHistoryPage;

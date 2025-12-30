@@ -1,0 +1,526 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Search, 
+  Filter, 
+  Download, 
+  Eye, 
+  RefreshCw, 
+  TrendingUp, 
+  TrendingDown,
+  DollarSign,
+  CreditCard,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  MoreVertical,
+  Calendar,
+  User
+} from 'lucide-react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from './ui/dialog';
+import { getAllPayments, getPaymentStats, updatePaymentStatus, Payment, PaymentStats } from '../api/paymentApi';
+
+export default function PaymentManagementPage() {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [stats, setStats] = useState<PaymentStats>({
+    total_payments: 0,
+    completed_payments: 0,
+    pending_payments: 0,
+    failed_payments: 0,
+    total_revenue: 0
+  });
+
+  useEffect(() => {
+    fetchPayments();
+    fetchStatistics();
+  }, []);
+
+  const fetchPayments = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const filters = {
+        limit: 100,
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(searchTerm && { search: searchTerm })
+      };
+      
+      const paymentsData = await getAllPayments(filters);
+      setPayments(paymentsData);
+    } catch (error: any) {
+      console.error('Error fetching payments:', error);
+      setError(error.message || 'Failed to fetch payments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStatistics = async () => {
+    try {
+      const statsData = await getPaymentStats();
+      setStats(statsData);
+    } catch (error) {
+      console.error('Error fetching statistics:', error);
+    }
+  };
+      console.error('Error fetching payments:', error);
+      setError('Error fetching payments: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStatistics = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${apiUrl}/api/payments/admin/statistics`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setStats(data.statistics);
+      }
+    } catch (error) {
+      console.error('Error fetching statistics:', error);
+    }
+  };
+
+  const updatePaymentStatus = async (paymentId, newStatus) => {
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${apiUrl}/api/payments/${paymentId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh payments list
+        fetchPayments();
+        fetchStatistics();
+        alert(`Payment status updated to ${newStatus}`);
+      } else {
+        alert('Failed to update payment status: ' + data.message);
+      }
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      alert('Error updating payment status: ' + error.message);
+    }
+  };
+
+  const refundPayment = async (paymentId, refundAmount = null, reason = '') => {
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${apiUrl}/api/payments/${paymentId}/refund`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ refundAmount, reason })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh payments list
+        fetchPayments();
+        fetchStatistics();
+        alert(`Payment refunded successfully. Refund ID: ${data.refundTransactionId}`);
+      } else {
+        alert('Failed to refund payment: ' + data.message);
+      }
+    } catch (error) {
+      console.error('Error refunding payment:', error);
+      alert('Error refunding payment: ' + error.message);
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'success':
+      case 'completed':
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'processing':
+      case 'created':
+      case 'pending':
+        return <Clock className="w-4 h-4 text-yellow-600" />;
+      case 'failed':
+        return <XCircle className="w-4 h-4 text-red-600" />;
+      case 'expired':
+      case 'cancelled':
+      case 'refunded':
+        return <AlertCircle className="w-4 h-4 text-gray-600" />;
+      default:
+        return <Clock className="w-4 h-4 text-gray-600" />;
+    }
+  };
+
+  const getStatusBadgeVariant = (status) => {
+    switch (status) {
+      case 'success':
+      case 'completed':
+        return 'success';
+      case 'processing':
+      case 'created':
+      case 'pending':
+        return 'warning';
+      case 'failed':
+        return 'destructive';
+      case 'expired':
+      case 'cancelled':
+      case 'refunded':
+        return 'secondary';
+      default:
+        return 'secondary';
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('vi-VN');
+  };
+
+  const filteredPayments = payments.filter(payment => {
+    const matchesSearch = 
+      payment.userFullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.transactionId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.bookingReference?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = statusFilter === 'all' || payment.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="w-8 h-8 animate-spin text-[#317752]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#021526]">Payment Management</h1>
+          <p className="text-gray-600 mt-1">Monitor and manage all payment transactions</p>
+        </div>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={fetchPayments}
+            className="border-[#317752] text-[#317752] hover:bg-[#317752] hover:text-white"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+          <Button className="bg-[#317752] hover:bg-[#2a6545] text-white">
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </Button>
+        </div>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Payments</p>
+                <p className="text-2xl font-bold text-[#021526]">{stats.totalPayments}</p>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-full">
+                <CreditCard className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Completed</p>
+                <p className="text-2xl font-bold text-green-600">{stats.completedPayments}</p>
+              </div>
+              <div className="p-3 bg-green-100 rounded-full">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Pending</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.pendingPayments}</p>
+              </div>
+              <div className="p-3 bg-yellow-100 rounded-full">
+                <Clock className="w-6 h-6 text-yellow-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Success Rate</p>
+                <p className="text-2xl font-bold text-[#317752]">{stats.successRate}%</p>
+              </div>
+              <div className="p-3 bg-[#317752]/10 rounded-full">
+                <TrendingUp className="w-6 h-6 text-[#317752]" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search by user, email, transaction ID, or booking reference..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#317752] focus:border-transparent"
+        >
+          <option value="all">All Status</option>
+          <option value="created">Created</option>
+          <option value="processing">Processing</option>
+          <option value="success">Success</option>
+          <option value="failed">Failed</option>
+          <option value="expired">Expired</option>
+        </select>
+      </div>
+
+      {/* Payments Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Payments ({filteredPayments.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <div className="text-red-600 mb-4 p-3 bg-red-50 rounded-lg">
+              {error}
+            </div>
+          )}
+          
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">User</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">Transaction ID</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">Amount</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">Method</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">Date</th>
+                  <th className="text-right py-3 px-4 font-medium text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPayments.map((payment) => (
+                  <tr key={payment.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3 px-4">
+                      <div>
+                        <div className="font-medium text-[#021526]">{payment.userFullName}</div>
+                        <div className="text-sm text-gray-600">{payment.userEmail}</div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="font-mono text-sm">{payment.transactionId}</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="font-semibold">{formatCurrency(payment.amount)}</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="capitalize">{payment.paymentMethod?.replace('-', ' ')}</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant={getStatusBadgeVariant(payment.status)} className="flex items-center gap-1 w-fit">
+                        {getStatusIcon(payment.status)}
+                        <span className="capitalize">{payment.status}</span>
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-sm text-gray-600">{formatDate(payment.createdAt)}</span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            onClick={() => setSelectedPayment(payment)}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          {payment.status === 'created' && (
+                            <DropdownMenuItem 
+                              onClick={() => updatePaymentStatus(payment.id, 'completed')}
+                            >
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Mark Completed
+                            </DropdownMenuItem>
+                          )}
+                          {(payment.status === 'success' || payment.status === 'completed') && (
+                            <DropdownMenuItem 
+                              onClick={() => refundPayment(payment.id)}
+                              className="text-red-600"
+                            >
+                              <XCircle className="w-4 h-4 mr-2" />
+                              Process Refund
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            
+            {filteredPayments.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                No payments found matching your criteria
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Payment Details Modal */}
+      {selectedPayment && (
+        <Dialog open={!!selectedPayment} onOpenChange={() => setSelectedPayment(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Payment Details</DialogTitle>
+              <DialogDescription>
+                Transaction ID: {selectedPayment.transactionId}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Customer</label>
+                  <p className="text-[#021526] font-medium">{selectedPayment.userFullName}</p>
+                  <p className="text-sm text-gray-600">{selectedPayment.userEmail}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Amount</label>
+                  <p className="text-[#021526] font-semibold text-lg">{formatCurrency(selectedPayment.amount)}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Payment Method</label>
+                  <p className="text-[#021526] capitalize">{selectedPayment.paymentMethod?.replace('-', ' ')}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Status</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    {getStatusIcon(selectedPayment.status)}
+                    <span className="capitalize">{selectedPayment.status}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-700">Description</label>
+                <p className="text-[#021526]">{selectedPayment.description || 'No description provided'}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Created At</label>
+                  <p className="text-[#021526]">{formatDate(selectedPayment.createdAt)}</p>
+                </div>
+                {selectedPayment.processedAt && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Processed At</label>
+                    <p className="text-[#021526]">{formatDate(selectedPayment.processedAt)}</p>
+                  </div>
+                )}
+              </div>
+              
+              {selectedPayment.bookingReference && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Booking Reference</label>
+                  <p className="text-[#021526] font-mono">{selectedPayment.bookingReference}</p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
